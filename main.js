@@ -130,28 +130,29 @@ for(var i = 0; i<(struct_general["nplay"] + struct_general["nsub"]); i++) {
         "totrest": 0
     }
     if (i<struct_general["nplay"]) {
-        pinfo.active = 1;
+        pinfo.active = 0;
     }
     struct_team["players"].push(pinfo)
 }
 //#endregion
 //#region Initialize Tables
 var tbl_match = {
-    "index": [1],
-    "period": ["0"],
-    "min_run": ["00"],
-    "sec_run": ["00"],
-    "min_eff": ["00"],
-    "sec_eff": ["00"],
-    "result": ["1-2-1"],
-    "player_no1": [-1],
-    "last_name1": [""],
-    "player_no2": [-1],
-    "last_name2": [""],
+    "index": [],
+    "period": [],
+    "timestamp": [],
+    "min_run": [],
+    "sec_run": [],
+    "min_eff": [],
+    "sec_eff": [],
+    "result": [],
+    "player_no": [],
+    "last_name": [],
+    "active": []
 }
 var tbl_metrics = {
     "index": [],
     "period": [],
+    "timestamp": [],
     "min_run": [],
     "sec_run": [],
     "min_eff": [],
@@ -214,17 +215,17 @@ clockKickOff.onclick = function() {
             if (struct_team.players[i].active==1) {
                 var timeMain = parseClock(struct_time["clock_main"],0);
                 var timePlay = parseClock(struct_time["clock_play"],0);
-                tbl_match["index"].push(i+2);
+                tbl_match["index"].push(i+1);
                 tbl_match["period"].push(struct_time["period"]);
+                tbl_match["timestamp"].push(new Date(Date.now()))
                 tbl_match["min_run"].push(timeMain[0]);
                 tbl_match["sec_run"].push(timeMain[1]);
                 tbl_match["min_eff"].push(timePlay[0]);
                 tbl_match["sec_eff"].push(timePlay[1]);
                 tbl_match["result"].push("lineup");
-                tbl_match["player_no1"].push(struct_team["players"][i]["pno"]);
-                tbl_match["last_name1"].push(struct_team["players"][i]["nlast"]);
-                tbl_match["player_no2"].push(-1);
-                tbl_match["last_name2"].push("");
+                tbl_match["player_no"].push(struct_team["players"][i]["pno"]);
+                tbl_match["last_name"].push(struct_team["players"][i]["nlast"]);
+                tbl_match["active"].push(1);
             }
         }
         // Update Match Table
@@ -233,15 +234,15 @@ clockKickOff.onclick = function() {
         var timePlay = parseClock(struct_time["clock_play"],0);
         tbl_match["index"].push(tbl_match["index"].length + 1)
         tbl_match["period"].push(struct_time["period"]);
+        tbl_match["timestamp"].push(new Date(Date.now()))
         tbl_match["min_run"].push(timeMain[0]);
         tbl_match["sec_run"].push(timeMain[1]);
         tbl_match["min_eff"].push(timePlay[0]);
         tbl_match["sec_eff"].push(timePlay[1]);
         tbl_match["result"].push("kick off");
-        tbl_match["player_no1"].push(-1);
-        tbl_match["last_name1"].push("");
-        tbl_match["player_no2"].push(-1);
-        tbl_match["last_name2"].push("");
+        tbl_match["player_no"].push(-1);
+        tbl_match["last_name"].push("");
+        tbl_match["active"].push("");
 
         // Toggles
         struct_time.kickofftgl = 1;
@@ -275,15 +276,15 @@ clockBreak.onclick = function() {
     var timePlay = parseClock(struct_time["clock_play"],0);
     tbl_match["index"].push(tbl_match["index"].length + 1)
     tbl_match["period"].push(struct_time["period"]);
+    tbl_match["timestamp"].push(new Date(Date.now()))
     tbl_match["min_run"].push(timeMain[0]);
     tbl_match["sec_run"].push(timeMain[1]);
     tbl_match["min_eff"].push(timePlay[0]);
     tbl_match["sec_eff"].push(timePlay[1]);
     tbl_match["result"].push("break");
-    tbl_match["player_no1"].push(-1);
-    tbl_match["last_name1"].push("");
-    tbl_match["player_no2"].push(-1);
-    tbl_match["last_name2"].push("");
+    tbl_match["player_no"].push(-1);
+    tbl_match["last_name"].push("");
+    tbl_match["active"].push(0);
 
     minutesM = "0";
     secondsM = "0";
@@ -390,7 +391,7 @@ function startMain() {
         secondsM = 0;
     }
 
-    displayClock(clockMain, minutesM, secondsM, 0, struct_time.period-1)
+    displayClock(clockMain, minutesM, secondsM, 1, struct_time.period-1)
 }
 function startPlay() {
     secondsP++;
@@ -619,7 +620,7 @@ function updateLiveVis() {
 
         wrRatio = Math.round(100*struct_team.players[i-1].tplay / (struct_team.players[i-1].trest+1))/100;
         if (wrRatio>=1) {
-            
+            wrRatio = 2 - Math.round(10*struct_team.players[i-1].trest / (struct_team.players[i-1].tplay+1))/10;
         }
         txtWR = document.getElementById("wr" + i);
         txtWR.innerHTML = wrRatio;
@@ -653,103 +654,72 @@ function updateWRPer(pno) {
 //#endregion
 
 //#region Team Actions+Passing
-function setSelected(i) {
-    el = document.getElementById("play" + i);
-    if (struct_team["players"][i-1]["selected"]==0) {
-        struct_team["players"][i-1]["selected"] = 1;
-        el.classList.add('selected');
-    } else {
-        struct_team["players"][i-1]["selected"] = 0;
-        el.classList.remove('selected');
-    }
-}
-function checkSub() {
-    var selArray = getKeyArray(struct_team["players"], "selected");
-    if (arrSum(selArray)==2) {
-        switchPlayers(selArray);
-    }
-}
-function switchPlayers(selArray){
-    var pID1 = getAllIndexes(selArray, 1)[0];
-    var pID2 = getAllIndexes(selArray, 1)[1];
+function toggleActive(pID){
+    el = document.getElementById("play" + (pID));
+    perno = struct_time["period"];
 
-    // Determine on and off
-    var onID = pID1;
-    var offID = pID2;
-    var validSub = false;
-    if (struct_team.players[pID1].active==0 && struct_team.players[pID2].active==1) {
-        onID = pID1;
-        offID = pID2;
-        validSub = true;
-    } else if (struct_team.players[pID1].active==1 && struct_team.players[pID2].active==0) {
-        onID = pID2;
-        offID = pID1;
-        validSub = true;
-    }
-    el1 = document.getElementById("play" + (onID+1));
-    el2 = document.getElementById("play" + (offID+1));
-
-    if (validSub) {
-        struct_team["players"][offID]["active"] = 0;
-        struct_team["players"][onID]["active"] = 1;
-
-        // Update Analysis Table
-        perno = struct_time["period"];
-        if (struct_time.kickofftgl==1) {
-            tbl_period.Rotations[perno][onID] += 1;
-            tbl_period.Rotations[0][onID] += 1;
+    // Determine sub on or sub off
+    var tglActive = 1
+    var sub_string = "";
+    if (struct_team.players[pID-1].active==0) {
+        struct_team["players"][pID-1]["active"] = 1;
+        el.classList.add('active');
+        if (perno>0) {
+            // Update Live Analysis Table
+            tbl_period.Rotations[perno][pID-1] += 1;
+            // Update Match Table Section
+            tbl_period.Rotations[0][pID-1] += 1;
         }
-
         // Update Live Vis
-        struct_team.players[onID].tplay = 0;
-        struct_team.players[offID].trest = 0;
-        updateLiveVis();
-
-        // Update Match Table
-        if (struct_time.kickofftgl==1) {
-            updateTime();
-            var timeMain = parseClock(struct_time["clock_main"],0);
-            var timePlay = parseClock(struct_time["clock_play"],0);
-            tbl_match["index"].push(tbl_match["index"].length + 1);
-            tbl_match["period"].push(struct_time["period"]);
-            tbl_match["min_run"].push(timeMain[0]);
-            tbl_match["sec_run"].push(timeMain[1]);
-            tbl_match["min_eff"].push(timePlay[0]);
-            tbl_match["sec_eff"].push(timePlay[1]);
-            tbl_match["result"].push("substitution");
-            tbl_match["player_no1"].push(struct_team["players"][offID]["pno"]);
-            tbl_match["last_name1"].push(struct_team["players"][offID]["nlast"]);
-            tbl_match["player_no2"].push(struct_team["players"][onID]["pno"]);
-            tbl_match["last_name2"].push(struct_team["players"][onID]["nlast"]);
-        }
-        // Aesthetics
-        el1.classList.add('active');
-        el2.classList.remove('active');
-        //checkSub();
-        updateAnlUITable();
+        struct_team.players[pID-1].tplay = 0;
+        // Set substitution string
+        sub_string = "sub on";
+    } else if (struct_team.players[pID-1].active==1) {
+        tglActive = 0
+        struct_team["players"][pID-1]["active"] = 0;
+        el.classList.remove('active');
+        // Update Live Vis
+        struct_team.players[pID-1].trest = 0;
+        sub_string = "sub off";
     }
-    struct_team.players[onID].selected = 0;
-    struct_team.players[offID].selected = 0;
-    el1.classList.remove('selected');
-    el2.classList.remove('selected');
+    
+    // Update Match Table
+    if (struct_time.kickofftgl==1) {
+        updateTime();
+        var timeMain = parseClock(struct_time["clock_main"],0);
+        var timePlay = parseClock(struct_time["clock_play"],0);
+        tbl_match["index"].push(tbl_match["index"].length + 1);
+        tbl_match["period"].push(struct_time["period"]);
+        tbl_match["timestamp"].push(new Date(Date.now()))
+        tbl_match["min_run"].push(timeMain[0]);
+        tbl_match["sec_run"].push(timeMain[1]);
+        tbl_match["min_eff"].push(timePlay[0]);
+        tbl_match["sec_eff"].push(timePlay[1]);
+        tbl_match["result"].push(sub_string);
+        tbl_match["player_no"].push(struct_team["players"][pID-1]["pno"]);
+        tbl_match["last_name"].push(struct_team["players"][pID-1]["nlast"]);
+        tbl_match["active"].push(tglActive)
+    }
+    updateLiveVis();
+    updateAnlUITable();
 }
 
-btnP1.onclick = function(){setSelected(1); checkSub()}
-btnP2.onclick = function(){setSelected(2); checkSub()}
-btnP3.onclick = function(){setSelected(3); checkSub()}
-btnP4.onclick = function(){setSelected(4); checkSub()}
-btnP5.onclick = function(){setSelected(5); checkSub()}
-btnP6.onclick = function(){setSelected(6); checkSub()}
-btnP7.onclick = function(){setSelected(7); checkSub()}
-btnP8.onclick = function(){setSelected(8); checkSub()}
-btnP9.onclick = function(){setSelected(9); checkSub()}
-btnP10.onclick = function(){setSelected(10); checkSub()}
-btnP11.onclick = function(){setSelected(11); checkSub()}
-btnP12.onclick = function(){setSelected(12); checkSub()}
-btnP13.onclick = function(){setSelected(13); checkSub()}
-btnP14.onclick = function(){setSelected(14); checkSub()}
-btnP15.onclick = function(){setSelected(15); checkSub()}
-btnP16.onclick = function(){setSelected(16); checkSub()}
+btnP1.onclick = function(){toggleActive(1)}
+btnP2.onclick = function(){toggleActive(2)}
+btnP3.onclick = function(){toggleActive(3)}
+btnP4.onclick = function(){toggleActive(4)}
+btnP5.onclick = function(){toggleActive(5)}
+btnP6.onclick = function(){toggleActive(6)}
+btnP7.onclick = function(){toggleActive(7)}
+btnP8.onclick = function(){toggleActive(8)}
+btnP9.onclick = function(){toggleActive(9)}
+btnP10.onclick = function(){toggleActive(10)}
+btnP11.onclick = function(){toggleActive(11)}
+btnP12.onclick = function(){toggleActive(12)}
+btnP13.onclick = function(){toggleActive(13)}
+btnP14.onclick = function(){toggleActive(14)}
+btnP15.onclick = function(){toggleActive(15)}
+btnP16.onclick = function(){toggleActive(16)}
 
 btnGH.onclick = function() {
     struct_match["score"][0]++
@@ -776,15 +746,15 @@ function addGoal(lbl) {
     var timePlay = parseClock(struct_time["clock_play"],0);
     tbl_match["index"].push(tbl_match["index"].length + 1);
     tbl_match["period"].push(struct_time["period"]);
+    tbl_match["timestamp"].push(new Date(Date.now()))
     tbl_match["min_run"].push(timeMain[0]);
     tbl_match["sec_run"].push(timeMain[1]);
     tbl_match["min_eff"].push(timePlay[0]);
     tbl_match["sec_eff"].push(timePlay[1]);
     tbl_match["result"].push(lbl);
-    tbl_match["player_no1"].push(-1);
-    tbl_match["last_name1"].push(-1);
-    tbl_match["player_no2"].push(-1);
-    tbl_match["last_name2"].push(-1);
+    tbl_match["player_no"].push(-1);
+    tbl_match["last_name"].push("");
+    tbl_match["active"].push("");
 }
 
 //#endregion
@@ -796,6 +766,7 @@ function addMetric(team, metric, result, total) {
     var timePlay = parseClock(struct_time["clock_play"],0);
     tbl_metrics["index"].push(tbl_metrics["index"].length + 1);
     tbl_metrics["period"].push(struct_time["period"]);
+    tbl_metrics["timestamp"].push(new Date(Date.now()))
     tbl_metrics["min_run"].push(timeMain[0]);
     tbl_metrics["sec_run"].push(timeMain[1]);
     tbl_metrics["min_eff"].push(timePlay[0]);
