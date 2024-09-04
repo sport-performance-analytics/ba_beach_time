@@ -374,6 +374,7 @@ clockStop.onclick = function() {
     var timePlay = parseClock(struct_time["clock_play"],0);
     tbl_match["index"].push(tbl_match["index"].length + 1)
     tbl_match["period"].push(struct_time["period"]);
+    tbl_match["timestamp"].push(new Date(Date.now()))
     tbl_match["min_run"].push(timeMain[0]);
     tbl_match["sec_run"].push(timeMain[1]);
     tbl_match["min_eff"].push(timePlay[0]);
